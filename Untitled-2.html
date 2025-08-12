@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>MySpot — Mobile Spotify Style</title>
+
+<!-- JSZip for ZIP import -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+<style>
+  /* Mobile-first Spotify-like theme (optimized for iPhone 12 Pro) */
+  :root{
+    --bg: #121212; --panel:#000; --muted:#9e9e9e; --white:#e6e6e6; --accent:#1db954;
+    --card:#181818; --glass: rgba(255,255,255,0.02);
+    --safe-top: env(safe-area-inset-top); --safe-bottom: env(safe-area-inset-bottom);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--white);font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+  .app{display:flex;flex-direction:column;height:100vh;max-height:100vh;overflow:hidden}
+
+  /* header */
+  header.topbar{height:56px;padding:6px 14px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border-bottom:1px solid rgba(255,255,255,0.02)}
+  .brand{display:flex;align-items:center;gap:10px}
+  .logo{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#15a34a)}
+  .title{font-size:17px;font-weight:700}
+
+  /* content area (scrollable) */
+  .content{flex:1;overflow:auto;padding:12px 12px 100px 12px;/* leave room for player & tabbar */}
+
+  /* home grid */
+  .section{margin-bottom:18px}
+  .section h3{margin:6px 6px 8px 6px;font-size:13px;color:var(--muted)}
+  .grid {display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  .album-card{background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);padding:10px;border-radius:8px;display:flex;flex-direction:column;gap:8px;cursor:pointer}
+  .album-art{width:100%;aspect-ratio:1/1;border-radius:6px;background-size:cover;background-position:center;box-shadow:0 6px 18px rgba(0,0,0,0.6)}
+  .album-meta{font-size:13px}
+  .album-meta .title{font-weight:700;color:var(--white)}
+  .album-meta .sub{color:var(--muted);font-size:12px}
+
+  /* library simple list */
+  .list {display:flex;flex-direction:column;gap:8px}
+  .list-row{display:flex;gap:10px;align-items:center;padding:8px;border-radius:8px}
+  .thumb{width:56px;height:56px;border-radius:6px;background-size:cover;background-position:center}
+  .row-meta{flex:1}
+  .row-meta .name{font-weight:600}
+  .row-meta .sub{color:var(--muted);font-size:12px}
+
+  /* track list (playlist view) */
+  .tracks{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+  .track{display:flex;gap:10px;align-items:center;padding:8px;border-radius:8px}
+  .track:hover{background:rgba(255,255,255,0.02)}
+  .num{width:32px;text-align:center;color:var(--muted)}
+  .ttitle{flex:1}
+  .dur{width:42px;text-align:right;color:var(--muted)}
+
+  /* search input */
+  .search{padding:8px;border-radius:10px;background:#0f0f0f;color:var(--white);border:1px solid rgba(255,255,255,0.03);margin-bottom:12px}
+
+  /* bottom mini-player */
+  .mini-player{position:fixed;left:0;right:0;bottom:56px - var(--safe-bottom);height:70px;padding:8px 12px;background:linear-gradient(180deg,#151515,var(--bg));display:flex;align-items:center;gap:12px;border-top:1px solid rgba(255,255,255,0.03);backdrop-filter: blur(6px)}
+  .mini-left{display:flex;gap:8px;align-items:center;min-width:120px}
+  .mini-cover{width:56px;height:56px;border-radius:6px;background-size:cover;background-position:center}
+  .mini-meta{font-size:13px}
+  .mini-meta .t{font-weight:700}
+  .mini-controls{display:flex;align-items:center;gap:10px;flex:1;justify-content:center}
+  .mini-controls button{background:transparent;border:none;color:var(--white);font-size:18px;padding:8px;border-radius:8px}
+  .mini-right{min-width:80px;display:flex;align-items:center;justify-content:flex-end;gap:8px;color:var(--muted)}
+
+  /* bottom tabbar */
+  .tabbar{position:fixed;left:0;right:0;bottom:0;padding:8px;display:flex;gap:12px;justify-content:space-around;background:#0b0b0b;border-top:1px solid rgba(255,255,255,0.02);height:56px}
+  .tabbar button{background:transparent;border:none;color:var(--muted);font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .tabbar button.active{color:var(--white)}
+
+  /* full player modal */
+  .player-full{position:fixed;left:0;right:0;top:0;bottom:0;background:linear-gradient(180deg,#0b0b0b,#070707);display:none;flex-direction:column;z-index:40;padding:18px;overflow:auto}
+  .player-full .big-cover{width:88%;max-width:640px;margin:22px auto;border-radius:10px;background-size:cover;background-position:center;aspect-ratio:1/1}
+  .player-full .title{font-size:22px;font-weight:800;text-align:center;margin-top:12px}
+  .player-full .artist{font-size:14px;color:var(--muted);text-align:center;margin-bottom:18px}
+  .player-controls{display:flex;flex-direction:column;gap:12px;align-items:center}
+  .big-controls{display:flex;gap:20px;align-items:center}
+  .big-controls button{background:transparent;border:none;color:var(--white);font-size:28px}
+  .prog{width:96%;height:6px;background:rgba(255,255,255,0.05);border-radius:6px;overflow:hidden}
+  .prog .bar{height:100%;background:linear-gradient(90deg,var(--accent),#16a34a);width:0%}
+
+  /* small helpers */
+  .hidden{display:none}
+  .center{display:flex;align-items:center;justify-content:center}
+  @media(min-width:700px){ .grid{grid-template-columns:repeat(3,1fr)} }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand"><div class="logo" aria-hidden="true"></div><div class="title" id="pageTitle">Home</div></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="uploadBtn" type="file" accept="audio/*,.zip" multiple style="display:none" />
+      <button onclick="document.getElementById('uploadBtn').click()" aria-label="Upload" style="background:transparent;border:none;color:var(--accent)">Upload</button>
+      <button onclick="clearAll()" style="background:transparent;border:none;color:var(--muted)">Clear</button>
+    </div>
+  </header>
+
+  <main class="content" id="content">
+    <!-- HOME -->
+    <section id="homeSection" class="section">
+      <h3>Good evening</h3>
+      <div id="homeGrid" class="grid"></div>
+    </section>
+
+    <!-- SEARCH -->
+    <section id="searchSection" class="section hidden">
+      <input id="searchInput" class="search" placeholder="Search songs, albums, artists" oninput="doSearch(this.value)" />
+      <div id="searchGrid" class="grid"></div>
+    </section>
+
+    <!-- LIBRARY -->
+    <section id="libSection" class="section hidden">
+      <h3>Your library</h3>
+      <div id="libList" class="list"></div>
+    </section>
+
+    <!-- PLAYLIST / ALBUM VIEW (dynamic) -->
+    <section id="albumView" class="section hidden">
+      <!-- populated dynamically -->
+    </section>
+  </main>
+
+  <!-- mini player -->
+  <div class="mini-player" id="miniPlayer" aria-hidden="true">
+    <div class="mini-left">
+      <div class="mini-cover" id="miniCover" style="background:#222"></div>
+      <div class="mini-meta">
+        <div class="t" id="miniTitle">Not playing</div>
+        <div class="sub" id="miniArtist">—</div>
+      </div>
+    </div>
+    <div class="mini-controls">
+      <button onclick="prevTrack()" title="Previous">⏮</button>
+      <button id="miniPlayBtn" onclick="togglePlay()" title="Play/Pause">▶</button>
+      <button onclick="nextTrack()" title="Next">⏭</button>
+    </div>
+    <div class="mini-right">
+      <button onclick="openFullPlayer()">🔼</button>
+    </div>
+  </div>
+
+  <!-- tabbar -->
+  <nav class="tabbar">
+    <button id="tabHome" class="active" onclick="goto('home')">Home<br><span style="font-size:14px">🏠</span></button>
+    <button id="tabSearch" onclick="goto('search')">Search<br><span style="font-size:14px">🔎</span></button>
+    <button id="tabLibrary" onclick="goto('library')">Your Library<br><span style="font-size:14px">📚</span></button>
+  </nav>
+</div>
+
+<!-- full player overlay -->
+<div class="player-full" id="playerFull" aria-hidden="true">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <button onclick="closeFullPlayer()" style="background:transparent;border:none;color:var(--muted)">Close</button>
+    <div style="font-weight:700">Now Playing</div>
+    <div style="width:44px"></div>
+  </div>
+  <div class="center">
+    <div class="big-cover" id="bigCover" style="background:#222"></div>
+  </div>
+  <div class="title" id="fullTitle">—</div>
+  <div class="artist" id="fullArtist">—</div>
+
+  <div class="player-controls">
+    <div class="big-controls">
+      <button onclick="prevTrack()">⏮</button>
+      <button id="fullPlayBtn" onclick="togglePlay()">▶</button>
+      <button onclick="nextTrack()">⏭</button>
+    </div>
+    <div style="width:100%;display:flex;gap:8px;align-items:center;justify-content:center;margin-top:6px">
+      <div style="font-size:12px;color:var(--muted)" id="curTime">0:00</div>
+      <div class="prog" onclick="seekByClick(event)" style="cursor:pointer"><div class="bar" id="bar"></div></div>
+      <div style="font-size:12px;color:var(--muted)" id="durTime">0:00</div>
+    </div>
+  </div>
+</div>
+
+<!-- audio element (hidden) -->
+<audio id="audio" preload="metadata"></audio>
+
+<script>
+/* Mobile Spotify-like player
+   Option A: imports zip or audio files (JSZip required for zip import)
+   Groups tracks into fake albums by filename matching (customizable)
+   Persists in IndexedDB (basic in-memory fallback used here for simplicity)
+*/
+
+const audio = document.getElementById('audio');
+const miniPlayer = document.getElementById('miniPlayer');
+const miniCover = document.getElementById('miniCover');
+const miniTitle = document.getElementById('miniTitle');
+const miniArtist = document.getElementById('miniArtist');
+const miniPlayBtn = document.getElementById('miniPlayBtn');
+const playerFull = document.getElementById('playerFull');
+const bigCover = document.getElementById('bigCover');
+const fullTitle = document.getElementById('fullTitle');
+const fullArtist = document.getElementById('fullArtist');
+const fullPlayBtn = document.getElementById('fullPlayBtn');
+const bar = document.getElementById('bar');
+const curTime = document.getElementById('curTime');
+const durTime = document.getElementById('durTime');
+
+let DB = { tracks: [], albums: [], playlists: [] }; // in-memory; persisted to IndexedDB in future iterations
+let playOrder = [];
+let playIndex = 0;
+let playing = false;
+let progInterval = null;
+
+/* --- filename -> album grouping rules (matching substrings) --- */
+const albumRules = [
+  { name: "Kanye West — Graduation", match: ["Good Morning","Champion","Stronger","I Wonder","Good Life","Can't Tell Me Nothing","Can't Tell Me Nothing","Can't Tell Me Nothing.mp3","Can't Tell Me Nothing (","Barry Bonds","Everything I Am","The Glory","Homecoming","Big Brother","Good Night","Can't Tell Me Nothing.mp3","Can't Tell Me Nothing"] },
+  { name: "Undertale OST — Toby Fox", match: ["Hopes And Dreams","Finale"] },
+  { name: "Ultrakill OST — Heaven Pierce Her", match: ["Heaven Pierce Her","War Without Reason","ULTRAKILL"] },
+  { name: "YOASOBI — Singles", match: ["YOASOBI","夜に駆ける","夜に駆ける_"] },
+  { name: "Attack on Titan — Singles", match: ["Red Swan"] },
+  { name: "椎名もた — Singles", match: ["椎名もた","siinamota","少女A"] },
+  // fallback single group for anything else - they will get own album later
+];
+
+/* Map of filename tokens provided earlier (we're using fuzzy matching), will match user-supplied file names */
+function assignAlbumForFilename(fname){
+  for (const r of albumRules){
+    for (const m of r.match){
+      if (!m) continue;
+      const low = fname.toLowerCase();
+      if (m.toLowerCase().replace(/\s+/g,'').length===0) continue;
+      // match if substring appears or if cleaned filenames equal
+      if (low.includes(m.toLowerCase().replace(/\s+/g,'').slice(0,6)) || low.includes(m.toLowerCase().slice(0,6))) {
+        return r.name;
+      }
+      // full token match
+      if (low.includes(m.toLowerCase()) || low.includes(m.toLowerCase().replace(/\s+/g,''))) return r.name;
+    }
+  }
+  // heuristics: if file includes 'kanye' or 'graduation' -> Kanye
+  if (fname.toLowerCase().includes('kanye') || fname.toLowerCase().includes('graduation')) return "Kanye West — Graduation";
+  return null;
+}
+
+/* --- album art generator (canvas) --- */
+function genCover(name, w=800){
+  const h = w;
+  const c = document.createElement('canvas'); c.width=w; c.height=h;
+  const ctx = c.getContext('2d');
+  // color palette derived from name
+  let hash = 0; for (let i=0;i<name.length;i++) hash = (hash*31 + name.charCodeAt(i))|0;
+  const hueA = Math.abs(hash)%360;
+  const hueB = Math.abs((hash*7))%360;
+  const g = ctx.createLinearGradient(0,0,w,h);
+  g.addColorStop(0, `hsl(${hueA}deg 70% 40% / 1)`);
+  g.addColorStop(1, `hsl(${hueB}deg 60% 30% / 1)`);
+  ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
+  // subtle overlay
+  ctx.fillStyle = 'rgba(255,255,255,0.03)'; ctx.fillRect(0,0,w,h);
+  // bottom band
+  ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(0,h-120,w,120);
+  // big initials / icon
+  ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.font = 'bold '+Math.floor(w/8)+'px system-ui';
+  const words = name.split(/\s+/).slice(0,2).map(s=>s[0]||'').join('').toUpperCase() || '♪';
+  ctx.fillText(words, 48, h-44);
+  // small name
+  ctx.font = '20px system-ui'; ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.fillText(name.slice(0,30), 48, h-18);
+  return c.toDataURL('image/jpeg',0.85);
+}
+
+/* format seconds */
+function fmtTime(s){ if (!s||isNaN(s)) return '0:00'; s=Math.floor(s); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+
+/* UI navigation */
+function goto(tab){
+  document.getElementById('pageTitle').textContent = tab==='home'?'Home':tab==='search'?'Search':'Your Library';
+  document.getElementById('homeSection').classList.toggle('hidden', tab!=='home');
+  document.getElementById('searchSection').classList.toggle('hidden', tab!=='search');
+  document.getElementById('libSection').classList.toggle('hidden', tab!=='library');
+  document.getElementById('albumView').classList.add('hidden');
+  document.getElementById('tabHome').classList.toggle('active', tab==='home');
+  document.getElementById('tabSearch').classList.toggle('active', tab==='search');
+  document.getElementById('tabLibrary').classList.toggle('active', tab==='library');
+  if (tab==='home') renderHome();
+  if (tab==='library') renderLibrary();
+  if (tab==='search') renderSearch('');
+}
+
+/* ----- render functions ----- */
+function renderHome(){
+  const grid = document.getElementById('homeGrid'); grid.innerHTML='';
+  // show albums first: created albums from DB.albums
+  if (DB.albums.length===0){
+    // show generated "playlists" from tracks if none
+    const groups = autoGroupAlbumsFromTracks();
+    for (const ag of groups) {
+      createAlbumCard(ag, grid);
+    }
+  } else {
+    for (const a of DB.albums){
+      createAlbumCard(a, grid);
+    }
+  }
+}
+
+function createAlbumCard(a, container){
+  const div = document.createElement('div'); div.className='album-card';
+  div.innerHTML = `<div class="album-art" style="background-image:url('${a.cover}')"></div>
+    <div class="album-meta"><div class="title">${escapeHtml(a.name)}</div><div class="sub">${a.tracks.length} tracks</div></div>`;
+  div.onclick = ()=> openAlbum(a.id);
+  container.appendChild(div);
+}
+
+function renderLibrary(){
+  const out = document.getElementById('libList'); out.innerHTML='';
+  // show albums as list
+  for (const a of DB.albums){
+    const row = document.createElement('div'); row.className='list-row';
+    row.innerHTML = `<div class="thumb" style="background-image:url('${a.cover}')"></div>
+      <div class="row-meta"><div class="name">${escapeHtml(a.name)}</div><div class="sub">${a.tracks.length} tracks</div></div>`;
+    row.onclick = ()=> openAlbum(a.id);
+    out.appendChild(row);
+  }
+  // show "All Songs"
+  if (DB.tracks.length){
+    const hr = document.createElement('div'); hr.style.height='10px'; out.appendChild(hr);
+    DB.tracks.forEach((t)=> {
+      const r = document.createElement('div'); r.className='list-row';
+      r.innerHTML = `<div class="thumb" style="background-image:url('${t.cover}')"></div>
+        <div class="row-meta"><div class="name">${escapeHtml(t.name)}</div><div class="sub">${fmtTime(t.duration)}</div></div>`;
+      r.onclick = ()=> playSingle(t.id);
+      out.appendChild(r);
+    });
+  }
+}
+
+function renderSearch(q){
+  const grid = document.getElementById('searchGrid'); grid.innerHTML='';
+  const list = DB.tracks.filter(t=> {
+    if (!q) return true;
+    const L = q.trim().toLowerCase();
+    return (t.name||'').toLowerCase().includes(L) || (t.filename||'').toLowerCase().includes(L) || (t.album||'').toLowerCase().includes(L);
+  });
+  list.forEach(t=>{
+    const a = DB.albums.find(x=> x.tracks.includes(t.id));
+    const card = document.createElement('div'); card.className='album-card';
+    card.innerHTML = `<div class="album-art" style="background-image:url('${t.cover|| (a? a.cover: genCover(t.name)) }')"></div>
+      <div class="album-meta"><div class="title">${escapeHtml(t.name)}</div><div class="sub">${escapeHtml(t.filename)}</div></div>`;
+    card.onclick = ()=> playSingle(t.id);
+    grid.appendChild(card);
+  });
+}
+
+/* open album view */
+function openAlbum(albumId){
+  const album = DB.albums.find(a=>a.id===albumId);
+  if (!album) return;
+  document.getElementById('albumView').classList.remove('hidden');
+  document.getElementById('homeSection').classList.add('hidden');
+  document.getElementById('searchSection').classList.add('hidden');
+  document.getElementById('libSection').classList.add('hidden');
+  // render header and tracks
+  const out = document.getElementById('albumView'); out.innerHTML='';
+  const header = document.createElement('div'); header.innerHTML = `
+    <div style="display:flex;gap:12px;align-items:center">
+      <div class="album-art" style="width:120px;height:120px;background-image:url('${album.cover}')"></div>
+      <div>
+        <div style="font-size:12px;color:var(--muted)">ALBUM</div>
+        <div style="font-weight:800;font-size:18px">${escapeHtml(album.name)}</div>
+        <div style="margin-top:8px;color:var(--muted)">${album.tracks.length} tracks</div>
+        <div style="margin-top:10px"><button onclick="playAlbum('${album.id}')">▶ Play</button></div>
+      </div>
+    </div>`;
+  out.appendChild(header);
+  const trackWrap = document.createElement('div'); trackWrap.className='tracks';
+  let i=1;
+  for (const tid of album.tracks){
+    const t = DB.tracks.find(x=>x.id===tid);
+    const row = document.createElement('div'); row.className='track';
+    row.innerHTML = `<div class="num">${i++}</div><div class="ttitle"><div style="font-weight:700">${escapeHtml(t.name)}</div><div class="sub">${escapeHtml(t.filename)}</div></div><div class="muted">Local</div><div class="dur">${fmtTime(t.duration)}</div>`;
+    row.onclick = ()=> playFromAlbum(album.id, tid);
+    trackWrap.appendChild(row);
+  }
+  out.appendChild(trackWrap);
+}
+
+/* playback controls */
+function playSingle(trackId){
+  const t = DB.tracks.find(x=>x.id===trackId); if(!t) return;
+  playOrder = [trackId]; playIndex=0; playCurrent();
+}
+
+function playAlbum(albumId){
+  const a = DB.albums.find(x=>x.id===albumId);
+  if (!a) return;
+  playOrder = a.tracks.slice(); playIndex = 0; playCurrent();
+}
+
+function playFromAlbum(albumId, tid){
+  const a = DB.albums.find(x=>x.id===albumId);
+  if (!a) return;
+  playOrder = a.tracks.slice(); playIndex = a.tracks.indexOf(tid);
+  if (playIndex<0) playIndex=0;
+  playCurrent();
+}
+
+function playCurrent(){
+  if (!playOrder.length) return;
+  const id = playOrder[playIndex];
+  const t = DB.tracks.find(x=>x.id===id); if (!t) return;
+  // create object url and play
+  const url = URL.createObjectURL(t.blob);
+  audio.src = url;
+  audio.play().then(()=> {
+    playing = true; updateMini(t); updateFull(t);
+    miniPlayer.style.display='flex';
+    document.getElementById('miniPlayBtn').textContent = '⏸';
+    document.getElementById('fullPlayBtn').textContent = '⏸';
+    // set interval to update progress
+    if (progInterval) clearInterval(progInterval);
+    progInterval = setInterval(()=> updateProgress(), 250);
+    audio.onended = ()=> {
+      // go next
+      if (playIndex < playOrder.length-1) { playIndex++; playCurrent(); } else { audio.pause(); playing=false; document.getElementById('miniPlayBtn').textContent='▶'; document.getElementById('fullPlayBtn').textContent='▶'; clearInterval(progInterval); }
+    };
+    // revoke object URL after short time
+    setTimeout(()=> URL.revokeObjectURL(url), 2000);
+  }).catch(e=> {
+    alert('Playback failed. On iOS open in Safari (not the Shortcuts preview) for better playback support.');
+    console.error(e);
+  });
+}
+
+function togglePlay(){
+  if (audio.paused) { audio.play(); playing=true; document.getElementById('miniPlayBtn').textContent='⏸'; document.getElementById('fullPlayBtn').textContent='⏸'; }
+  else { audio.pause(); playing=false; document.getElementById('miniPlayBtn').textContent='▶'; document.getElementById('fullPlayBtn').textContent='▶'; }
+}
+
+function prevTrack(){
+  if (playIndex>0) playIndex--; playCurrent();
+}
+function nextTrack(){
+  if (playIndex < playOrder.length-1) playIndex++; playCurrent();
+}
+
+function updateMini(track){
+  miniCover.style.backgroundImage = `url('${track.cover || genCover(track.name)}')`;
+  miniTitle.textContent = track.name;
+  miniArtist.textContent = track.album || 'Local';
+}
+function updateFull(track){
+  bigCover.style.backgroundImage = `url('${track.cover || genCover(track.name)}')`;
+  fullTitle.textContent = track.name;
+  fullArtist.textContent = track.album || 'Local';
+}
+
+function updateProgress(){
+  const cur = audio.currentTime || 0; const dur = audio.duration || 0;
+  const pct = dur ? Math.round((cur/dur)*100) : 0;
+  bar.style.width = pct + '%';
+  curTime.textContent = fmtTime(cur);
+  durTime.textContent = fmtTime(dur);
+}
+
+/* seek */
+function seekByClick(e){
+  const rect = e.currentTarget.getBoundingClientRect();
+  const pct = (e.clientX - rect.left)/rect.width;
+  if (audio.duration) audio.currentTime = audio.duration * pct;
+}
+
+/* open/close full player */
+function openFullPlayer(){ playerFull.style.display='flex'; playerFull.setAttribute('aria-hidden','false'); }
+function closeFullPlayer(){ playerFull.style.display='none'; playerFull.setAttribute('aria-hidden','true'); }
+
+/* --- file import logic (files or zip) --- */
+document.getElementById('uploadBtn').addEventListener('change', async (ev)=>{
+  const files = Array.from(ev.target.files || []);
+  for (const f of files){
+    if (f.name.toLowerCase().endsWith('.zip')){
+      if (window.JSZip){
+        try {
+          const z = new JSZip();
+          const content = await z.loadAsync(await f.arrayBuffer());
+          for (const filename of Object.keys(content.files)){
+            if (/\.(mp3|m4a|wav|ogg|flac)$/i.test(filename)){
+              const fileData = await content.files[filename].async('blob');
+              const fileObj = new File([fileData], filename);
+              await handleAudioFile(fileObj);
+            }
+          }
+        } catch(err){ console.error('zip error',err); alert('ZIP import failed'); }
+      } else {
+        alert('ZIP import requires JSZip (bundled).');
+      }
+    } else {
+      await handleAudioFile(f);
+    }
+  }
+  // refresh UI
+  renderHome(); renderLibrary(); renderSearch(document.getElementById('searchInput').value || '');
+  ev.target.value = '';
+});
+
+/* handle a single audio file (store metadata, assign to album) */
+async function handleAudioFile(file){
+  const id = Math.random().toString(36).slice(2,10);
+  const blob = new Blob([await file.arrayBuffer()], { type: file.type || 'audio/mpeg' });
+  // try to read duration using audio element
+  let duration = 0;
+  try {
+    const au = document.createElement('audio'); au.src = URL.createObjectURL(blob);
+    await new Promise((res)=> au.addEventListener('loadedmetadata', res));
+    duration = au.duration || 0;
+    URL.revokeObjectURL(au.src);
+  } catch(e){}
+  // create track object
+  const track = { id, name: file.name.replace(/\.[^/.]+$/,''), filename: file.name, blob, duration, album: null, cover: null };
+  // match album via rules or heuristics
+  const albumName = assignAlbumForFilename(file.name) || (file.name.split('-')[0] && file.name.split('-')[0].trim()) || null;
+  if (albumName){
+    track.album = albumName;
+  } else {
+    // fallback: single-track album by artist from filename if possible
+    track.album = 'Singles';
+  }
+  track.cover = genCover(track.album || track.name);
+  DB.tracks.push(track);
+  // add to or create album in DB.albums
+  let alb = DB.albums.find(a=>a.name === track.album);
+  if (!alb){
+    alb = { id: Math.random().toString(36).slice(2,10), name: track.album, cover: genCover(track.album), tracks: [] };
+    DB.albums.push(alb);
+  }
+  alb.tracks.push(track.id);
+  // keep playlists optional (we won't create user playlists here)
+}
+
+/* auto-group tracks into album groups if DB empty */
+function autoGroupAlbumsFromTracks(){
+  // if no tracks, show placeholder demos
+  if (!DB.tracks.length) {
+    // show some placeholder cards to make UI feel like Spotify
+    const placeholders = ['Made for you','Daily Mix','Chill Vibes','Recently played'];
+    return placeholders.map((n)=> ({ id:n, name:n, cover: genCover(n), tracks: [] }));
+  }
+  // group DB.tracks by assigned album or filename heuristic
+  const map = {};
+  for (const t of DB.tracks){
+    const albumName = t.album || assignAlbumForFilename(t.filename) || 'Singles';
+    if (!map[albumName]) map[albumName] = { id: albumName, name: albumName, cover: genCover(albumName), tracks: [] };
+    if (!map[albumName].tracks.includes(t.id)) map[albumName].tracks.push(t.id);
+  }
+  // also set DB.albums if not set
+  DB.albums = Object.values(map);
+  return DB.albums;
+}
+
+/* search helper */
+function doSearch(q){ renderSearch(q); }
+
+/* clear all (resets in-memory DB) */
+function clearAll(){
+  if (!confirm('Clear local library (this does not delete original files)?')) return;
+  DB = { tracks: [], albums: [], playlists: [] };
+  playOrder = []; playIndex=0;
+  renderHome(); renderLibrary(); renderSearch('');
+  miniPlayer.style.display='none';
+  playerFull.style.display='none';
+  audio.pause(); audio.src='';
+}
+
+/* small helpers */
+function escapeHtml(s=''){ return String(s).replace(/[&<>"']/g, m=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[m])); }
+
+/* init sample state with the files you uploaded earlier (if present) --
+   we already extracted your zip server-side earlier; but for Option A we rely on user uploading zip on phone.
+   To make the app feel populated during testing in browser, we won't auto-insert audio here.
+*/
+(function init(){
+  // initial render
+  renderHome();
+  renderLibrary();
+})();
+</script>
+
+</body>
+</html>
