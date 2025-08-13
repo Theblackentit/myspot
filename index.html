@@ -1,140 +1,406 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Spotify Clone</title>
-  <style>
-    body {
-      background-color: #121212;
-      color: white;
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-    }
-    .player-bar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      background-color: #181818;
-      padding: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      z-index: 1000;
-    }
-    .content {
-      padding-top: 70px; /* space for player bar */
-      padding-bottom: 70px; /* space for nav bar */
-    }
-    .section {
-      padding: 15px;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: 15px;
-    }
-    .card {
-      background: linear-gradient(135deg, #3a3a3a, #2a2a2a);
-      border-radius: 8px;
-      padding: 10px;
-      text-align: center;
-    }
-    nav {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background-color: #181818;
-      display: flex;
-      justify-content: space-around;
-      padding: 10px 0;
-      z-index: 1000;
-    }
-    nav a {
-      color: white;
-      text-decoration: none;
-      text-align: center;
-      font-size: 14px;
-    }
-    nav a span {
-      display: block;
-      font-size: 20px;
-    }
-    /* Upload button style */
-    .upload-btn {
-      display: block;
-      width: 100%;
-      padding: 15px;
-      background-color: #1DB954;
-      color: white;
-      text-align: center;
-      font-size: 16px;
-      border-radius: 8px;
-      border: none;
-      cursor: pointer;
-      margin-top: 15px;
-    }
-    .upload-btn:active {
-      background-color: #169c44;
-    }
-    input[type="file"] {
-      display: none;
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Phone Player</title>
+<style>
+  :root{
+    --bg:#0b0b0b;--bg-elev:#121212;--card:#181818;--muted:#a7a7a7;--text:#fff;
+    --accent:#1ed760;--accent-2:#1db954;
+    --radius:16px;--pad:14px;--shadow:0 8px 24px rgba(0,0,0,.4)
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,Segoe UI,Roboto,Helvetica,Arial}
+  /* layout */
+  .app{display:grid;grid-template-rows:auto 1fr auto;min-height:100vh}
+  header{position:sticky;top:0;z-index:5;background:var(--bg);
+    padding:12px env(safe-area-inset-right) 8px env(safe-area-inset-left)}
+  header .now{display:grid;grid-template-columns:64px 1fr auto;gap:12px;align-items:center}
+  .art-mini{width:64px;height:64px;background:#222;border-radius:8px}
+  .title-mini{font-weight:700;font-size:15px}
+  .muted{color:var(--muted);font-size:12px}
+  .pill{display:flex;gap:10px;align-items:center}
+  .pill button{width:36px;height:36px;border-radius:10px;border:0;background:#2a2a2a;color:#fff;font-size:16px}
+  .content{overflow:auto;padding:0 14px 110px}
+  h2{margin:12px 2px 8px;font-size:20px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding-bottom:10px}
+  .card{background:var(--card);border-radius:18px;padding:10px;box-shadow:var(--shadow)}
+  .cover{width:100%;aspect-ratio:1/1;border-radius:12px;background:#222;display:block;object-fit:cover}
+  .card h3{margin:10px 6px 2px;font-size:18px}
+  .card p{margin:0 6px 10px;color:var(--muted);font-size:12px}
+  /* library list */
+  .list{display:flex;flex-direction:column;gap:10px}
+  .row{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;background:var(--card);padding:8px;border-radius:12px}
+  .row img{width:64px;height:64px;border-radius:8px;object-fit:cover}
+  .row .meta .t{font-weight:700}
+  .row .meta .s{color:var(--muted);font-size:12px}
+  .row button{border:0;background:#2a2a2a;color:#fff;border-radius:10px;padding:8px 10px}
+  /* search */
+  .searchbar{position:sticky;top:0;background:var(--bg);padding:10px 0;z-index:2}
+  .searchbar input{width:100%;padding:12px 14px;border-radius:10px;border:0;background:#1f1f1f;color:#fff}
+  /* bottom player */
+  .player{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--bg-elev);
+    padding:10px env(safe-area-inset-right) calc(10px + env(safe-area-inset-bottom)) env(safe-area-inset-left);
+    border-top:1px solid #232323;box-shadow:0 -6px 20px rgba(0,0,0,.5)}
+  .player .bar{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+  .player .art{width:56px;height:56px;border-radius:8px;background:#222}
+  .player .track{min-width:0}
+  .player .track .t{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .player .controls button{width:38px;height:38px;border:0;border-radius:50%;background:#2a2a2a;color:#fff}
+  .progress{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;margin-top:8px}
+  .progress input[type=range]{width:100%}
+  .accent{color:var(--accent)}
+  /* bottom nav */
+  nav{position:fixed;left:0;right:0;bottom:88px;background:transparent;z-index:9}
+  .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 14px}
+  .tab{background:#111;border:1px solid #1f1f1f;border-radius:14px;padding:10px;text-align:center;color:#eaeaea}
+  .tab.active{background:#1a1a1a;border-color:#2a2a2a}
+  /* FAB upload */
+  .fab{position:fixed;right:16px;bottom:170px;z-index:15}
+  .fab button{width:58px;height:58px;border-radius:50%;border:0;background:var(--accent-2);color:#000;font-weight:900;font-size:22px;box-shadow:var(--shadow)}
+  .hidden{display:none}
+  /* modal sheet */
+  .sheet{position:fixed;left:0;right:0;bottom:0;top:0;background:rgba(0,0,0,.55);display:none;z-index:20}
+  .sheet .panel{position:absolute;left:0;right:0;bottom:0;background:var(--bg-elev);border-radius:18px 18px 0 0;padding:16px;box-shadow:var(--shadow)}
+  .sheet.open{display:block}
+  .btn{background:#2a2a2a;border:0;color:#fff;border-radius:10px;padding:12px 14px}
+  .ghost{background:transparent;border:1px solid #2a2a2a}
+  .spacer{height:8px}
+</style>
 </head>
 <body>
-
-  <div class="player-bar">
-    <div>Not playing</div>
-    <div>
-      ⏮ ▶ ⏭
-    </div>
-  </div>
-
-  <div class="content" id="main-content">
-    <div class="section">
-      <h2>Good Evening</h2>
-      <div class="grid">
-        <div class="card">Made for you</div>
-        <div class="card">Daily Mix</div>
-        <div class="card">Chill Vibes</div>
-        <div class="card">Recently Played</div>
+<div class="app">
+  <header>
+    <div class="now">
+      <img class="art-mini" id="miniArt" alt="">
+      <div>
+        <div class="title-mini" id="miniTitle">Not playing</div>
+        <div class="muted" id="miniArtist">—</div>
+      </div>
+      <div class="pill">
+        <button id="prevBtn">⏮︎</button>
+        <button id="playBtn">▶︎</button>
+        <button id="nextBtn">⏭︎</button>
       </div>
     </div>
+  </header>
 
-    <div class="section" id="library-section" style="display:none;">
-      <h2>Your Library</h2>
-      <label for="file-upload" class="upload-btn">📂 Upload Songs</label>
-      <input id="file-upload" type="file" multiple accept="audio/*">
-      <div id="song-list"></div>
+  <main class="content" id="pane-home" role="region" aria-label="Home">
+    <h2>Good evening</h2>
+    <div class="grid" id="homeGrid"><!-- album cards injected --></div>
+  </main>
+
+  <main class="content hidden" id="pane-search" role="region" aria-label="Search">
+    <div class="searchbar">
+      <input id="q" placeholder="What do you want to listen to?" autocomplete="off">
+    </div>
+    <div class="list" id="searchList"></div>
+  </main>
+
+  <main class="content hidden" id="pane-library" role="region" aria-label="Your Library">
+    <h2>Your Library</h2>
+    <div class="list" id="libraryList"></div>
+  </main>
+
+  <!-- bottom nav -->
+  <nav>
+    <div class="tabs">
+      <button class="tab active" data-tab="home">Home</button>
+      <button class="tab" data-tab="search">Search</button>
+      <button class="tab" data-tab="library">Your Library</button>
+    </div>
+  </nav>
+
+  <!-- bottom player -->
+  <div class="player" aria-label="Player">
+    <div class="bar">
+      <img class="art" id="art" alt="">
+      <div class="track">
+        <div class="t" id="title">—</div>
+        <div class="muted" id="artist">—</div>
+      </div>
+      <div class="controls">
+        <button id="pPrev">⏮︎</button>
+        <button id="pPlay">▶︎</button>
+        <button id="pNext">⏭︎</button>
+      </div>
+    </div>
+    <div class="progress">
+      <span id="cur">0:00</span>
+      <input id="seek" type="range" min="0" max="100" value="0">
+      <span id="dur">0:00</span>
     </div>
   </div>
 
-  <nav>
-    <a href="#" onclick="showSection('main-content')"><span>🏠</span>Home</a>
-    <a href="#"><span>🔍</span>Search</a>
-    <a href="#" onclick="showSection('library-section')"><span>📚</span>Your Library</a>
-  </nav>
+  <!-- floating upload -->
+  <div class="fab">
+    <button id="fab">＋</button>
+  </div>
 
-  <script>
-    function showSection(id) {
-      document.querySelectorAll('.section').forEach(s => s.style.display = 'none');
-      document.getElementById(id).style.display = 'block';
+  <!-- upload sheet -->
+  <div class="sheet" id="sheet">
+    <div class="panel">
+      <h3 style="margin:0 0 8px">Add music</h3>
+      <p class="muted" style="margin:0 0 10px">Pick MP3/M4A files from Files app. They’ll be stored on this device (IndexedDB), not uploaded.</p>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <input id="filepick" type="file" accept="audio/*" multiple class="hidden">
+        <button class="btn" id="pickBtn">Choose files…</button>
+        <button class="btn ghost" id="closeSheet">Close</button>
+      </div>
+      <div class="spacer"></div>
+      <p class="muted">Tip: you can also host songs in <code>/music/</code> on your repo. Use “Scan hosted” to import them into your local library.</p>
+      <button class="btn" id="scanHosted">Scan hosted (manifest.json)</button>
+    </div>
+  </div>
+</div>
+
+<audio id="audio" preload="metadata" crossorigin="anonymous"></audio>
+
+<script>
+/* ---------- covers (real artwork, hot-linked) ---------- */
+const Covers = {
+  graduation: "https://upload.wikimedia.org/wikipedia/en/7/70/Graduation_%28album%29.jpg", /* source: Wikipedia */
+  undertale: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/86/Undertale_Soundtrack_2015.svg/512px-Undertale_Soundtrack_2015.svg.png", /* Wikipedia */
+  ultrakill: "https://f4.bcbits.com/img/a0084845941_10.jpg", /* Bandcamp */
+  yoru: "https://upload.wikimedia.org/wikipedia/en/thumb/9/93/Yoru_ni_Kakeru_cover_art.jpg/512px-Yoru_ni_Kakeru_cover_art.jpg", /* Wikipedia */
+  redswan: "https://upload.wikimedia.org/wikipedia/en/thumb/0/0b/Red_Swan.jpg/512px-Red_Swan.jpg" /* Wikipedia */
+};
+/* Pre-seeded album groups you can edit.  If you host files in /music/, set the `src` to those paths. */
+const SeedAlbums = [
+  {
+    id:"graduation", name:"Graduation", artist:"Kanye West",
+    cover:Covers.graduation,
+    tracks:[
+      {t:"Good Morning", a:"Kanye West", src:"/music/Graduation/01 Good Morning.mp3"},
+      {t:"Stronger", a:"Kanye West", src:"/music/Graduation/02 Stronger.mp3"},
+      {t:"Flashing Lights", a:"Kanye West", src:"/music/Graduation/03 Flashing Lights.mp3"}
+    ]
+  },
+  {
+    id:"undertale", name:"UNDERTALE Soundtrack", artist:"Toby Fox",
+    cover:Covers.undertale,
+    tracks:[
+      {t:"Hopes and Dreams", a:"Toby Fox", src:"/music/Undertale/Hopes_and_Dreams.mp3"},
+      {t:"Finale", a:"Toby Fox", src:"/music/Undertale/Finale.mp3"}
+    ]
+  },
+  {
+    id:"ultrakill", name:"ULTRAKILL: INFINITE HYPERDEATH", artist:"Heaven Pierce Her",
+    cover:Covers.ultrakill,
+    tracks:[
+      {t:"Panic Betrayer", a:"Heaven Pierce Her", src:"/music/ULTRAKILL/Panic_Betrayer.mp3"}
+    ]
+  },
+  {
+    id:"yoru", name:"Yoru ni Kakeru", artist:"YOASOBI",
+    cover:Covers.yoru,
+    tracks:[
+      {t:"Yoru ni Kakeru", a:"YOASOBI", src:"/music/Yoasobi/Yoru_ni_Kakeru.mp3"}
+    ]
+  },
+  {
+    id:"redswan", name:"Red Swan", artist:"Yoshiki feat. Hyde",
+    cover:Covers.redswan,
+    tracks:[
+      {t:"Red Swan", a:"Yoshiki feat. Hyde", src:"/music/RedSwan/Red_Swan.mp3"}
+    ]
+  }
+];
+
+/* ---------- tiny library using IndexedDB ---------- */
+const DB_NAME="myplayer-db", DB_STORE="tracks";
+let db, queue=[], index=0, current=null;
+
+function openDB(){
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded=()=>req.result.createObjectStore(DB_STORE,{keyPath:"id"});
+    req.onsuccess=()=>{db=req.result;res()}
+    req.onerror=()=>rej(req.error)
+  })
+}
+function putTrack(track){ // {id, t, a, album, cover, blobURL|src, kind}
+  return new Promise((res,rej)=>{
+    const tx=db.transaction(DB_STORE,"readwrite");
+    tx.objectStore(DB_STORE).put(track);
+    tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error);
+  })
+}
+function allTracks(){
+  return new Promise((res,rej)=>{
+    const tx=db.transaction(DB_STORE); const req=tx.objectStore(DB_STORE).getAll();
+    req.onsuccess=()=>res(req.result||[]); req.onerror=()=>rej(req.error);
+  })
+}
+
+/* ---------- UI helpers ---------- */
+const $=sel=>document.querySelector(sel);
+const panes={home:$('#pane-home'), search:$('#pane-search'), library:$('#pane-library')};
+document.querySelectorAll('.tab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    Object.values(panes).forEach(p=>p.classList.add('hidden'));
+    panes[btn.dataset.tab].classList.remove('hidden')
+  })
+});
+
+/* Upload sheet */
+const sheet=$('#sheet'); const filepick=$('#filepick');
+$('#fab').onclick=()=>sheet.classList.add('open');
+$('#closeSheet').onclick=()=>sheet.classList.remove('open');
+$('#pickBtn').onclick=()=>filepick.click();
+filepick.onchange=async e=>{
+  const files=[...e.target.files];
+  for(const f of files){
+    const blobURL=URL.createObjectURL(f);
+    const id=crypto.randomUUID();
+    const guessedMeta=guessMeta(f.name);
+    await putTrack({id, t:guessedMeta.title, a:guessedMeta.artist, album:guessedMeta.album, cover:guessedMeta.cover, src:blobURL, kind:"blob"});
+  }
+  await hydrate();
+  sheet.classList.remove('open');
+  alert(`Imported ${files.length} file(s) to this device.`);
+};
+
+/* Optional: import from hosted /music/ via a manifest.json */
+$('#scanHosted').onclick=async()=>{
+  try{
+    const r=await fetch('/music/manifest.json',{cache:'no-store'});
+    if(!r.ok) throw new Error('manifest missing');
+    const manifest=await r.json();
+    for(const tr of manifest.tracks){
+      tr.id=crypto.randomUUID(); tr.kind="remote";
+      await putTrack(tr);
     }
+    await hydrate();
+    sheet.classList.remove('open');
+    alert('Imported hosted tracks into your local library.');
+  }catch(e){ alert('No /music/manifest.json found in this site.') }
+};
 
-    document.getElementById('file-upload').addEventListener('change', function(event) {
-      const list = document.getElementById('song-list');
-      list.innerHTML = '';
-      Array.from(event.target.files).forEach(file => {
-        const div = document.createElement('div');
-        div.textContent = file.name;
-        list.appendChild(div);
-      });
-    });
-  </script>
+/* Seed albums (only as cards on Home; you can tap to queue) */
+function renderHome(){
+  const grid=$('#homeGrid'); grid.innerHTML='';
+  for(const album of SeedAlbums){
+    const card=document.createElement('div'); card.className='card';
+    card.innerHTML=`
+      <img class="cover" src="${album.cover}" alt="">
+      <h3>${album.name}</h3>
+      <p>${album.artist} • ${album.tracks.length} track(s)</p>`;
+    card.onclick=()=>playAlbum(album);
+    grid.append(card);
+  }
+}
+function playAlbum(album){
+  queue = album.tracks.map(t=>({
+    id:crypto.randomUUID(), t:t.t, a:t.a, album:album.name, cover:album.cover, src:t.src, kind:"remote"
+  }));
+  index=0; play(queue[index]);
+}
 
+/* library + search */
+async function hydrate(){
+  const tracks=await allTracks();
+  renderLibrary(tracks);
+  hookSearch(tracks);
+}
+function renderLibrary(tracks){
+  const list=$('#libraryList'); list.innerHTML='';
+  tracks.forEach(tr=>{
+    const row=document.createElement('div'); row.className='row';
+    row.innerHTML=`
+      <img src="${tr.cover||guessMeta(tr.t).cover}" alt="">
+      <div class="meta"><div class="t">${tr.t}</div><div class="s">${tr.a||'Unknown'} • ${tr.album||'Local'}</div></div>
+      <button>Play</button>`;
+    row.querySelector('button').onclick=()=>{queue=[tr]; index=0; play(tr)}
+    list.append(row);
+  });
+}
+function hookSearch(tracks){
+  const q=$('#q'), list=$('#searchList');
+  const render=items=>{
+    list.innerHTML=''; items.forEach(tr=>{
+      const row=document.createElement('div'); row.className='row';
+      row.innerHTML=`
+        <img src="${tr.cover||guessMeta(tr.t).cover}">
+        <div class="meta"><div class="t">${tr.t}</div><div class="s">${tr.a||'Unknown'}</div></div>
+        <button>▶︎</button>`;
+      row.querySelector('button').onclick=()=>{queue=[tr]; index=0; play(tr)};
+      list.append(row);
+    })
+  };
+  render(tracks);
+  q.oninput=()=>render(tracks.filter(tr=>{
+    const s=(tr.t+' '+(tr.a||'')+' '+(tr.album||'')).toLowerCase();
+    return s.includes(q.value.toLowerCase())
+  }));
+}
+
+/* very light filename → metadata guesser so uploads look nice */
+function guessMeta(name){
+  const n=name.replace(/\.[^/.]+$/,'');
+  const low=n.toLowerCase();
+  const meta={title:n, artist:'', album:'Local', cover:''};
+  if(low.includes('graduation')){ meta.cover=Covers.graduation; meta.album='Graduation' }
+  else if(low.includes('undertale')||low.includes('hopes')||low.includes('finale')){ meta.cover=Covers.undertale; meta.album='UNDERTALE Soundtrack' }
+  else if(low.includes('ultrakill')){ meta.cover=Covers.ultrakill; meta.album='ULTRAKILL: INFINITE HYPERDEATH' }
+  else if(low.includes('yoru')||low.includes('yoasobi')){ meta.cover=Covers.yoru; meta.album='Yoru ni Kakeru' }
+  else if(low.includes('red swan')||low.includes('redswan')){ meta.cover=Covers.redswan; meta.album='Red Swan' }
+  return meta;
+}
+
+/* player */
+const audio=$('#audio');
+const playBtn=$('#playBtn'), nextBtn=$('#nextBtn'), prevBtn=$('#prevBtn');
+const pPlay=$('#pPlay'), pNext=$('#pNext'), pPrev=$('#pPrev');
+[playBtn,pPlay].forEach(b=>b.onclick=()=>toggle());
+[nextBtn,pNext].forEach(b=>b.onclick=()=>skip(1));
+[prevBtn,pPrev].forEach(b=>b.onclick=()=>skip(-1));
+$('#seek').oninput=e=>{
+  if(audio.duration) audio.currentTime=(e.target.value/100)*audio.duration;
+};
+audio.ontimeupdate=()=>{
+  if(!isFinite(audio.duration)) return;
+  $('#seek').value=(audio.currentTime/audio.duration)*100;
+  $('#cur').textContent=fmt(audio.currentTime); $('#dur').textContent=fmt(audio.duration);
+}
+audio.onended=()=>skip(1);
+
+function play(tr){
+  current=tr;
+  audio.src=tr.src;
+  audio.play().catch(()=>{}); // iOS requires user gesture; buttons will handle it
+  // update UI
+  $('#title').textContent=tr.t; $('#artist').textContent=tr.a||'';
+  $('#miniTitle').textContent=tr.t; $('#miniArtist').textContent=tr.a||'';
+  $('#art').src=tr.cover||''; $('#miniArt').src=tr.cover||'';
+  [playBtn,pPlay].forEach(b=>b.textContent='⏸︎');
+}
+function toggle(){
+  if(audio.paused){ audio.play(); [playBtn,pPlay].forEach(b=>b.textContent='⏸︎'); }
+  else{ audio.pause(); [playBtn,pPlay].forEach(b=>b.textContent='▶︎'); }
+}
+function skip(dir){
+  if(!queue.length){ audio.currentTime=0; return; }
+  index=(index+dir+queue.length)%queue.length;
+  play(queue[index]);
+}
+function fmt(s){ s|=0; const m=(s/60|0), ss=('0'+(s%60)).slice(-2); return `${m}:${ss}` }
+
+/* boot */
+(async()=>{
+  renderHome();
+  await openDB();
+  await hydrate();
+})();
+</script>
+
+<!--
+Covers sources:
+Graduation cover (Wikipedia). Undertale Soundtrack icon (Wikipedia). ULTRAKILL album art (Bandcamp page). YOASOBI "Yoru ni Kakeru" single art (Wikipedia).
+-->
 </body>
 </html>
